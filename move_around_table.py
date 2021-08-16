@@ -10,6 +10,10 @@ from std_srvs.srv import Empty, EmptyRequest
 import numpy as np
 import subprocess
 
+from table_extractor.msg import Table
+from mongodb_store.message_store import MessageStoreProxy
+
+
 def fill_goal(goal_x, goal_y, goal_yaw):
 	# fill ROS message	
 	pose = PoseStamped()
@@ -27,11 +31,29 @@ robot = Robot()
 whole_body = robot.get('whole_body')
 base = robot.get('omni_base')
 
-whole_body.move_to_joint_positions({'head_tilt_joint': -1.0})
+whole_body.move_to_joint_positions({'arm_flex_joint': 0.0,
+            'arm_lift_joint': 0.0,
+            'arm_roll_joint': 1.570,
+            'hand_motor_joint': 1.0,
+            'head_pan_joint': 0.0,
+            'head_tilt_joint': -0.75,
+            'wrist_flex_joint': -1.57,
+            'wrist_roll_joint': 0.0})
 whole_body.gaze_point(point=[0.68, 0 ,0.45], ref_frame_id='map')
 
-poses = np.loadtxt('sasha_lab.txt', delimiter=',')
+#poses = np.loadtxt('sasha_lab.txt', delimiter=',')
+#print(poses)
 
+msg_store = MessageStoreProxy()
+poses = []
+
+##TODO select the plane
+for msg, meta in msg_store.query(Table._type):
+	if msg.category=='table':
+		for pose in msg.viewposes:
+			np_pose = [pose.pose.position.x, pose.pose.position.y, pose.pose.position.z]
+			poses.append(np_pose)
+		poses = np.asarray(poses)
 
 stop_client = rospy.ServiceProxy('/viewpoint_controller/stop', Empty)
 stop_client.call(EmptyRequest())
