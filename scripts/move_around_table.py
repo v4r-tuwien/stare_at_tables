@@ -21,8 +21,9 @@ class StareAtTables:
 		self.base = self.robot.try_get('omni_base')
 		self.whole_body = self.robot.try_get('whole_body')
 		self.msg_store = MessageStoreProxy()
-		self.rosbag_path = '/media/v4r/FF64-D891/tidy_up_pipeline/stare_at_tables'
-
+		#self.rosbag_path = '/media/v4r/FF64-D891/tidy_up_pipeline/stare_at_tables'
+		self.rosbag_path = '/home/v4r/Markus_L/sasha_lab_bag'
+		self.storage_path = '/run/user/1002/gvfs/smb-share:server=markus-laptop.local,share=ff64-d891/tidy_up_pipeline/stare_at_tables'
 
 	def execute(self, goal):
 		for msg, meta in self.msg_store.query(Table._type):
@@ -92,6 +93,8 @@ class StareAtTables:
 		if rosbagflag:
 			rosbag.kill()
 			subprocess.call(["rosnode", "kill", "/my_bag"])
+			cmd_move = ['mv', rosbag_filename, self.storage_path]
+			move = subprocess.Popen(cmd_move, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		self.server.set_succeeded()
 if __name__ == '__main__':
   rospy.init_node('stare_at_tables')
