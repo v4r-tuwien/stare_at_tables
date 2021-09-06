@@ -6,6 +6,7 @@ from std_srvs.srv import Empty, EmptyRequest
 import numpy as np
 import subprocess
 from tf.transformations import quaternion_about_axis, quaternion_multiply
+import os
 
 from table_extractor.msg import Table
 from mongodb_store.message_store import MessageStoreProxy
@@ -20,7 +21,7 @@ class StareAtTables:
 		self.base = self.robot.try_get('omni_base')
 		self.whole_body = self.robot.try_get('whole_body')
 		self.msg_store = MessageStoreProxy()
-		self.rosbag_path = '/home/v4r/Markus_L/sasha_lab_bag/stare_at_tables'
+		self.rosbag_path = '/media/v4r/FF64-D891/tidy_up_pipeline/stare_at_tables'
 
 
 	def execute(self, goal):
@@ -61,7 +62,8 @@ class StareAtTables:
 		move_client.wait_for_server()
 
 		# start rosbag recording
-		cmd_rosbag = ['rosbag', 'record','-b','0','-o', self.rosbag_path,'/hsrb/head_rgbd_sensor/rgb/image_raw', '/hsrb/head_rgbd_sensor/depth_registered/image_raw','/tf','/tf_static','/hsrb/head_rgbd_sensor/rgb/camera_info',"__name:=my_bag"]
+		rosbag_filename = os.path.join(self.rosbag_path, str(goal.id)+'.bag')
+		cmd_rosbag = ['rosbag', 'record','-b','0','-O', rosbag_filename,'/hsrb/head_rgbd_sensor/rgb/image_raw', '/hsrb/head_rgbd_sensor/depth_registered/image_raw','/tf','/tf_static','/hsrb/head_rgbd_sensor/rgb/camera_info',"__name:=my_bag"]
 		rosbagflag = False
 		# move to poses
 		for pose in poses:
@@ -87,8 +89,9 @@ class StareAtTables:
 					break
 
 		# kill rosbag
-		rosbag.kill()
-		subprocess.call(["rosnode", "kill", "/my_bag"])
+		if rosbagflag:
+			rosbag.kill()
+			subprocess.call(["rosnode", "kill", "/my_bag"])
 		self.server.set_succeeded()
 if __name__ == '__main__':
   rospy.init_node('stare_at_tables')
