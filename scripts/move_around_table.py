@@ -13,6 +13,7 @@ from mongodb_store.message_store import MessageStoreProxy
 
 from stare_at_tables.msg import StareAtTablesAction
 
+import time
 class StareAtTables:
 	def __init__(self):
 		self.server = actionlib.SimpleActionServer('stare_at_tables', StareAtTablesAction, self.execute, False)
@@ -23,7 +24,8 @@ class StareAtTables:
 		self.msg_store = MessageStoreProxy()
 		#self.rosbag_path = '/media/v4r/FF64-D891/tidy_up_pipeline/stare_at_tables'
 		self.rosbag_path = '/home/v4r/Markus_L/sasha_lab_bag'
-		self.storage_path = '/run/user/1002/gvfs/smb-share:server=markus-laptop.local,share=ff64-d891/tidy_up_pipeline/stare_at_tables'
+		#self.storage_path = '/run/user/1002/gvfs/smb-share:server=markus-laptop.local,share=ff64-d891,user=markus/tidy_up_pipeline/stare_at_tables'
+		self.storage_path = 'v4r@10.0.0.112:/media/v4r/FF64-D891/tidy_up_pipeline/stare_at_tables'
 
 	def execute(self, goal):
 		for msg, meta in self.msg_store.query(Table._type):
@@ -53,7 +55,6 @@ class StareAtTables:
 					'wrist_roll_joint': 0.0})
 		self.whole_body.gaze_point(point=gaze_point, ref_frame_id='map')
 
-		print(poses)
 		stop_client = rospy.ServiceProxy('/viewpoint_controller/stop', Empty)
 		stop_client.call(EmptyRequest())
 
@@ -64,38 +65,48 @@ class StareAtTables:
 
 		# start rosbag recording
 		rosbag_filename = os.path.join(self.rosbag_path, str(goal.id)+'.bag')
+		print(rosbag_filename)
 		cmd_rosbag = ['rosbag', 'record','-b','0','-O', rosbag_filename,'/hsrb/head_rgbd_sensor/rgb/image_raw', '/hsrb/head_rgbd_sensor/depth_registered/image_raw','/tf','/tf_static','/hsrb/head_rgbd_sensor/rgb/camera_info',"__name:=my_bag"]
 		rosbagflag = False
 		# move to poses
 		for pose in poses:
-			print(pose)
 			goal = MoveBaseGoal()
 			goal.target_pose = pose
 			move_client.send_goal(goal)
-			print('pose goal sent')
 			self.whole_body.gaze_point(point=gaze_point, ref_frame_id='map')
 			rospy.sleep(0.5)
 			while True:
 				self.whole_body.gaze_point(point=gaze_point, ref_frame_id='map')
 				rospy.sleep(0.5)
 				#print('gaze in loop')
-				#print(move_client.get_goal_status_text())
-				#print(move_client.get_state())
+				# print(move_client.get_goal_status_text())
+				# print(move_client.get_state())
 				if move_client.get_state()>1:
 					if move_client.get_state()==3 and not rosbagflag:
 						rosbag = subprocess.Popen(cmd_rosbag,stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 						print("Start recording rosbag file...")
 						rosbagflag = True
-						rospy.sleep(0.5)
+						rospy.sleep(3.5)
 					break
 
 		# kill rosbag
 		if rosbagflag:
+			rospy.sleep(3.5)
 			rosbag.kill()
 			subprocess.call(["rosnode", "kill", "/my_bag"])
-			cmd_move = ['mv', rosbag_filename, self.storage_path]
+			start = time.time()
+			cmd_move = ['scp', rosbag_filename, self.storage_path]
 			move = subprocess.Popen(cmd_move, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		self.server.set_succeeded()
+			move.wait()
+			cmd_remove = ['rm', rosbag_filename]
+			remove = subprocess.Popen(cmd_remove, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+			remove.wait()
+			end = time.time()
+			
+			print(end - start)
+			self.server.set_succeeded()
+		else:
+			self.server.set_aborted()
 if __name__ == '__main__':
   rospy.init_node('stare_at_tables')
   server = StareAtTables()
