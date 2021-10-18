@@ -22,10 +22,10 @@ class StareAtTables:
 		self.base = self.robot.try_get('omni_base')
 		self.whole_body = self.robot.try_get('whole_body')
 		self.msg_store = MessageStoreProxy()
-		#self.rosbag_path = '/media/v4r/FF64-D891/tidy_up_pipeline/stare_at_tables'
-		self.rosbag_path = '/home/v4r/Markus_L/sasha_lab_bag'
-		#self.storage_path = '/run/user/1002/gvfs/smb-share:server=markus-laptop.local,share=ff64-d891,user=markus/tidy_up_pipeline/stare_at_tables'
-		self.storage_path = 'v4r@10.0.0.112:/media/v4r/FF64-D891/tidy_up_pipeline/stare_at_tables'
+		self.rosbag_path = rospy.get_param('/stare_at_tables/rosbag_path', '/home/v4r/Markus_L/sasha_lab_bag')
+		self.storage_path = rospy.get_param('/stare_at_tables/storage_path', 'v4r@10.0.0.112:/media/v4r/FF64-D891/tidy_up_pipeline/stare_at_tables')
+		self.topics = rospy.get_param('/stare_at_tables/topics', ['/hsrb/head_rgbd_sensor/rgb/image_raw', '/hsrb/head_rgbd_sensor/depth_registered/image_raw','/tf','/tf_static','/hsrb/head_rgbd_sensor/rgb/camera_info'])
+
 
 	def execute(self, goal):
 		for msg, meta in self.msg_store.query(Table._type):
@@ -66,7 +66,10 @@ class StareAtTables:
 		# start rosbag recording
 		rosbag_filename = os.path.join(self.rosbag_path, str(goal.id)+'.bag')
 		print(rosbag_filename)
-		cmd_rosbag = ['rosbag', 'record','-b','0','-O', rosbag_filename,'/hsrb/head_rgbd_sensor/rgb/image_raw', '/hsrb/head_rgbd_sensor/depth_registered/image_raw','/tf','/tf_static','/hsrb/head_rgbd_sensor/rgb/camera_info',"__name:=my_bag"]
+		#cmd_rosbag = ['rosbag', 'record','-b','0','-O', rosbag_filename,'/hsrb/head_rgbd_sensor/rgb/image_raw', '/hsrb/head_rgbd_sensor/depth_registered/image_raw','/tf','/tf_static','/hsrb/head_rgbd_sensor/rgb/camera_info',"__name:=my_bag"]
+		cmd_rosbag = ['rosbag', 'record','-b','0','-O', rosbag_filename]
+		cmd_rosbag.extend(self.topics)
+		cmd_rosbag.append("__name:=my_bag")
 		rosbagflag = False
 		# move to poses
 		for pose in poses:
@@ -100,7 +103,7 @@ class StareAtTables:
 			move.wait()
 			cmd_remove = ['rm', rosbag_filename]
 			remove = subprocess.Popen(cmd_remove, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-			remove.wait()
+			remove.wait()			
 			end = time.time()
 			
 			print(end - start)
